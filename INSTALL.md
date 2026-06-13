@@ -173,6 +173,7 @@ cd deploy; docker compose down -v
 | Grafana login loops / fails | Give Keycloak ~30s on first boot; it imports the realm on startup. |
 | Copilot shows heuristic, not LLM text | Ollama isn't running or `phi3.5` isn't pulled. Run `ollama pull phi3.5`. |
 | Dashboards show "No data" | Run `python deploy/scripts/seed_demo.py --reset` and `seed_outcomes.py`. |
+| **Business Outcomes** dashboard empty | The dashboard ships in the repo, but its **data does not** — run `python deploy/scripts/seed_outcomes.py` (it seeds KPIs and runs the correlation automatically). Requires the RCA service on port 8088. |
 | Port already in use | Change the published port in `deploy/docker-compose.yml`. |
 | `pip install -e sdk-python` warnings on Windows | Safe to ignore; verify with `python -c "import helios_sdk"`. |
 

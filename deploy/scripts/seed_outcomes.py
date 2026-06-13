@@ -119,8 +119,24 @@ def main() -> int:
 
     print(f"Seeded {len(kpi_rows)} KPI points + {len(runs)} runs across {BUCKETS} hourly buckets.")
     print("Latest window shows support_resolution_rate dropping 14% with failing telemetry.")
-    print("Now run:  curl -X POST 'http://localhost:8088/correlate?metric=support_resolution_rate'")
+
+    # Run the correlation so the Business Outcomes dashboard is populated end-to-end.
+    # Best-effort: if the RCA service isn't up yet, print the manual command.
+    _correlate("support_resolution_rate")
+    _correlate("revenue_per_hour")
     return 0
+
+
+def _correlate(metric: str, rca_url: str = "http://localhost:8088") -> None:
+    url = f"{rca_url}/correlate?metric={metric}"
+    try:
+        req = urllib.request.Request(url, method="POST")
+        with urllib.request.urlopen(req, timeout=60) as r:
+            body = json.loads(r.read().decode())
+        print(f"  correlated {metric}: {body.get('summary')}")
+    except Exception:  # noqa: BLE001 — best-effort convenience step
+        print(f"  (RCA service not reachable; run later: "
+              f"curl -X POST '{url}')")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://helios.dev/schema/v1/common.schema.json",
+  "title": "HELIOS common definitions (v1)",
+  "description": "Reusable type definitions shared by all HELIOS V1 record schemas.",
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+    },
+    "semver": {
+      "type": "string",
+      "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)$"
+    },
+    "trace_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{32}$",
+      "description": "OpenTelemetry trace id, 16 bytes hex-encoded."
+    },
+    "span_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{16}$",
+      "description": "OpenTelemetry span id, 8 bytes hex-encoded."
+    },
+    "rfc3339": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["ok", "error"]
+    },
+    "non_negative_int": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "unit_interval": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "tenant_id": {
+      "type": "string",
+      "minLength": 1,
+      "default": "default"
+    },
+    "envelope": {
+      "type": "object",
+      "description": "Fields present on every HELIOS record.",
+      "properties": {
+        "schema_version": { "$ref": "#/$defs/semver" },
+        "tenant_id": { "$ref": "#/$defs/tenant_id" },
+        "agent_run_id": { "$ref": "#/$defs/uuid" }
+      },
+      "required": ["schema_version", "tenant_id", "agent_run_id"]
+    }
+  }
+}

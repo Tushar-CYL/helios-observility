@@ -1,0 +1,140 @@
+{
+  "uid": "helios-mcp",
+  "title": "HELIOS · MCP Observability",
+  "description": "Model Context Protocol tool calls: per-server latency, failures, permission changes and the full tool-call chain.",
+  "tags": ["helios", "mcp", "agent-runtime-intelligence"],
+  "timezone": "browser",
+  "editable": true,
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-7d", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Total MCP Calls",
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" }, "editorType": "sql", "queryType": "table", "format": 1, "rawSql": "SELECT count() AS value FROM helios.mcp_invocation" }
+      ],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/.*/" }, "colorMode": "value", "graphMode": "none", "textMode": "value" },
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "blue" }, "unit": "short" }, "overrides": [] }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Failed Calls",
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" }, "editorType": "sql", "queryType": "table", "format": 1, "rawSql": "SELECT countIf(status = 'error') AS value FROM helios.mcp_invocation" }
+      ],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/.*/" }, "colorMode": "background", "graphMode": "none", "textMode": "value" },
+      "fieldConfig": { "defaults": { "unit": "short", "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 1 } ] } }, "overrides": [] }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Error Rate",
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" }, "editorType": "sql", "queryType": "table", "format": 1, "rawSql": "SELECT round(100 * countIf(status = 'error') / count(), 1) AS value FROM helios.mcp_invocation" }
+      ],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/.*/" }, "colorMode": "background", "graphMode": "none", "textMode": "value" },
+      "fieldConfig": { "defaults": { "unit": "percent", "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "orange", "value": 10 }, { "color": "red", "value": 25 } ] } }, "overrides": [] }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Avg Latency",
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 0 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" }, "editorType": "sql", "queryType": "table", "format": 1, "rawSql": "SELECT round(avg(latency_ms)) AS value FROM helios.mcp_invocation" }
+      ],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/.*/" }, "colorMode": "value", "graphMode": "none", "textMode": "value" },
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "purple" }, "unit": "ms" }, "overrides": [] }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Max Latency",
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 0 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" }, "editorType": "sql", "queryType": "table", "format": 1, "rawSql": "SELECT max(latency_ms) AS value FROM helios.mcp_invocation" }
+      ],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/.*/" }, "colorMode": "value", "graphMode": "none", "textMode": "value" },
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "orange" }, "unit": "ms" }, "overrides": [] }
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Permission Changes",
+      "description": "MCP calls where the granted permission scope changed from the prior call. A key audit signal.",
+      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 0 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" }, "editorType": "sql", "queryType": "table", "format": 1, "rawSql": "SELECT countIf(permission_changed = 1) AS value FROM helios.mcp_invocation" }
+      ],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/.*/" }, "colorMode": "background", "graphMode": "none", "textMode": "value" },
+      "fieldConfig": { "defaults": { "unit": "short", "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "orange", "value": 1 } ] } }, "overrides": [] }
+    },
+    {
+      "id": 7,
+      "type": "barchart",
+      "title": "Latency by MCP Server",
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 4 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" }, "editorType": "sql", "queryType": "table", "format": 1, "rawSql": "SELECT server_name AS server, round(avg(latency_ms)) AS avg_latency_ms, max(latency_ms) AS max_latency_ms FROM helios.mcp_invocation GROUP BY server_name ORDER BY max_latency_ms DESC" }
+      ],
+      "options": { "orientation": "horizontal", "showValue": "always", "legend": { "displayMode": "list", "placement": "bottom" }, "xField": "server" },
+      "fieldConfig": { "defaults": { "unit": "ms", "color": { "mode": "palette-classic" } }, "overrides": [] }
+    },
+    {
+      "id": 8,
+      "type": "barchart",
+      "title": "Failures by Mode",
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 4 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" }, "editorType": "sql", "queryType": "table", "format": 1, "rawSql": "SELECT failure_mode, count() AS failures FROM helios.mcp_invocation WHERE status = 'error' AND failure_mode != '' GROUP BY failure_mode ORDER BY failures DESC" }
+      ],
+      "options": { "orientation": "horizontal", "showValue": "always", "legend": { "displayMode": "list", "placement": "bottom" }, "xField": "failure_mode" },
+      "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "fixed", "fixedColor": "red" } }, "overrides": [] }
+    },
+    {
+      "id": 9,
+      "type": "table",
+      "title": "MCP Tool-Call Chain (ordered)",
+      "description": "Every MCP invocation in sequence — the chain a future agent makes across 20–50 servers. Errors highlighted.",
+      "gridPos": { "h": 11, "w": 24, "x": 0, "y": 13 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" }, "editorType": "sql", "queryType": "table", "format": 1, "rawSql": "SELECT sequence_index AS \"#\", server_name AS \"Server\", server_version AS \"Version\", transport AS \"Transport\", protocol_version AS \"MCP Proto\", method AS \"Method\", tool_name AS \"Tool\", latency_ms AS \"Latency (ms)\", status AS \"Status\", failure_mode AS \"Failure Mode\", permission_scope AS \"Scope\", if(permission_changed = 1, 'CHANGED', '') AS \"Perm Δ\" FROM helios.mcp_invocation ORDER BY sequence_index ASC" }
+      ],
+      "options": { "showHeader": true, "cellHeight": "sm" },
+      "fieldConfig": {
+        "defaults": { "custom": { "align": "auto", "filterable": true } },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Status" },
+            "properties": [ { "id": "custom.cellOptions", "value": { "type": "color-text" } }, { "id": "mappings", "value": [ { "type": "value", "options": { "error": { "color": "red", "index": 0 }, "ok": { "color": "green", "index": 1 } } } ] } ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Latency (ms)" },
+            "properties": [ { "id": "custom.cellOptions", "value": { "type": "gauge", "mode": "gradient" } }, { "id": "max", "value": 5000 }, { "id": "unit", "value": "ms" } ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Perm Δ" },
+            "properties": [ { "id": "custom.cellOptions", "value": { "type": "color-text" } }, { "id": "mappings", "value": [ { "type": "value", "options": { "CHANGED": { "color": "orange", "index": 0 } } } ] } ]
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,183 @@
+# HELIOS V1 — one-command local stack.
+#
+#   docker compose up -d
+#
+# Brings up the full Agent Runtime Intelligence pipeline:
+#   SDK --OTLP--> otel-collector --> { tempo, loki, mimir, clickhouse } --> grafana
+#
+# All data lives in named volumes (persists across restarts); nothing is written
+# to the host directly. Credentials below are local-dev defaults and MUST be
+# changed for any non-local deployment (hardened in Phase 8).
+
+name: helios
+
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8
+    container_name: helios-clickhouse
+    environment:
+      CLICKHOUSE_USER: helios
+      CLICKHOUSE_PASSWORD: helios
+      CLICKHOUSE_DB: helios
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    ports:
+      - "8123:8123" # HTTP
+      - "9000:9000" # native
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      # Phase 1 migrations are the single source of truth; applied on first boot.
+      - ../schema/clickhouse/migrations:/docker-entrypoint-initdb.d:ro
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--user", "helios", "--password", "helios", "--query", "SELECT 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+
+  tempo:
+    image: grafana/tempo:2.6.1
+    container_name: helios-tempo
+    command: ["-config.file=/etc/tempo/tempo.yaml"]
+    volumes:
+      - ./tempo/tempo.yaml:/etc/tempo/tempo.yaml:ro
+      - tempo_data:/var/tempo
+    ports:
+      - "3200:3200" # Tempo API
+    restart: unless-stopped
+
+  loki:
+    image: grafana/loki:3.3.2
+    container_name: helios-loki
+    command: ["-config.file=/etc/loki/loki.yaml"]
+    volumes:
+      - ./loki/loki.yaml:/etc/loki/loki.yaml:ro
+      - loki_data:/loki
+    ports:
+      - "3100:3100"
+    restart: unless-stopped
+
+  mimir:
+    image: grafana/mimir:2.14.2
+    container_name: helios-mimir
+    command: ["-config.file=/etc/mimir/mimir.yaml"]
+    volumes:
+      - ./mimir/mimir.yaml:/etc/mimir/mimir.yaml:ro
+      - mimir_data:/data/mimir
+    ports:
+      - "9009:9009"
+    restart: unless-stopped
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.123.0
+    container_name: helios-otel-collector
+    command: ["--config=/etc/otel/config.yaml"]
+    volumes:
+      - ./otel-collector/config.yaml:/etc/otel/config.yaml:ro
+    ports:
+      - "4317:4317" # OTLP gRPC
+      - "4318:4318" # OTLP HTTP
+      - "13133:13133" # health_check
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+      tempo:
+        condition: service_started
+      loki:
+        condition: service_started
+      mimir:
+        condition: service_started
+    restart: unless-stopped
+
+  rca:
+    build:
+      context: ../services/rca
+    image: helios-rca:0.1.0
+    container_name: helios-rca
+    environment:
+      HELIOS_CLICKHOUSE_URL: http://clickhouse:8123
+      HELIOS_CLICKHOUSE_USER: helios
+      HELIOS_CLICKHOUSE_PASSWORD: helios
+      HELIOS_CLICKHOUSE_DB: helios
+      HELIOS_RCA_REASONER: auto
+      HELIOS_OLLAMA_ENDPOINT: http://host.docker.internal:11434
+      HELIOS_OLLAMA_MODEL: phi3.5
+    ports:
+      - "8088:8088"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    restart: unless-stopped
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    container_name: helios-keycloak
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HTTP_ENABLED: "true"
+      KC_HOSTNAME_STRICT: "false"
+      KC_HEALTH_ENABLED: "true"
+    volumes:
+      - ./keycloak/realm-helios.json:/opt/keycloak/data/import/realm-helios.json:ro
+      - keycloak_data:/opt/keycloak/data
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    container_name: helios-grafana
+    environment:
+      GF_INSTALL_PLUGINS: grafana-clickhouse-datasource
+      # --- Auth: Keycloak (OIDC) with username/password login ---
+      GF_SERVER_ROOT_URL: http://localhost:3000/
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_AUTH_DISABLE_LOGIN_FORM: "false"
+      GF_AUTH_GENERIC_OAUTH_ENABLED: "true"
+      GF_AUTH_GENERIC_OAUTH_NAME: Keycloak
+      GF_AUTH_GENERIC_OAUTH_CLIENT_ID: grafana
+      GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET: helios-grafana-secret
+      GF_AUTH_GENERIC_OAUTH_SCOPES: "openid email profile roles"
+      GF_AUTH_GENERIC_OAUTH_AUTH_URL: http://localhost:8080/realms/helios/protocol/openid-connect/auth
+      GF_AUTH_GENERIC_OAUTH_TOKEN_URL: http://keycloak:8080/realms/helios/protocol/openid-connect/token
+      GF_AUTH_GENERIC_OAUTH_API_URL: http://keycloak:8080/realms/helios/protocol/openid-connect/userinfo
+      GF_AUTH_GENERIC_OAUTH_LOGIN_ATTRIBUTE_PATH: preferred_username
+      GF_AUTH_GENERIC_OAUTH_NAME_ATTRIBUTE_PATH: name
+      GF_AUTH_GENERIC_OAUTH_EMAIL_ATTRIBUTE_PATH: email
+      GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_PATH: "contains(roles[*], 'admin') && 'Admin' || contains(roles[*], 'viewer') && 'Viewer' || 'Viewer'"
+      GF_AUTH_GENERIC_OAUTH_ALLOW_ASSIGN_GRAFANA_ADMIN: "true"
+      GF_AUTH_GENERIC_OAUTH_USE_PKCE: "true"
+      GF_FEATURE_TOGGLES_ENABLE: traceqlEditor
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      keycloak:
+        condition: service_started
+      mimir:
+        condition: service_started
+      loki:
+        condition: service_started
+      tempo:
+        condition: service_started
+      clickhouse:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  clickhouse_data:
+  tempo_data:
+  loki_data:
+  mimir_data:
+  grafana_data:
+  keycloak_data:

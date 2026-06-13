@@ -1,0 +1,134 @@
+{
+  "uid": "helios-memory",
+  "title": "HELIOS · Memory Observability",
+  "description": "Agent memory operations: reads/writes/evicts, provenance, retrieval confidence and — critically — stale memory that drives wrong answers.",
+  "tags": ["helios", "memory", "agent-runtime-intelligence"],
+  "timezone": "browser",
+  "editable": true,
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-7d", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Total Memory Ops",
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" }, "editorType": "sql", "queryType": "table", "format": 1, "rawSql": "SELECT count() AS value FROM helios.memory_operation" }
+      ],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/.*/" }, "colorMode": "value", "graphMode": "none", "textMode": "value" },
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "blue" }, "unit": "short" }, "overrides": [] }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Reads",
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" }, "editorType": "sql", "queryType": "table", "format": 1, "rawSql": "SELECT countIf(op = 'read') AS value FROM helios.memory_operation" }
+      ],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/.*/" }, "colorMode": "value", "graphMode": "none", "textMode": "value" },
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "blue" }, "unit": "short" }, "overrides": [] }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Writes / Updates",
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" }, "editorType": "sql", "queryType": "table", "format": 1, "rawSql": "SELECT countIf(op IN ('write', 'update')) AS value FROM helios.memory_operation" }
+      ],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/.*/" }, "colorMode": "value", "graphMode": "none", "textMode": "value" },
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "green" }, "unit": "short" }, "overrides": [] }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Stale Reads",
+      "description": "Reads of memory flagged is_stale = true. These are the prime suspects for wrong answers.",
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 0 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" }, "editorType": "sql", "queryType": "table", "format": 1, "rawSql": "SELECT countIf(op = 'read' AND is_stale = 1) AS value FROM helios.memory_operation" }
+      ],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/.*/" }, "colorMode": "background", "graphMode": "none", "textMode": "value" },
+      "fieldConfig": { "defaults": { "unit": "short", "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 1 } ] } }, "overrides": [] }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Stale Read Rate",
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 0 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" }, "editorType": "sql", "queryType": "table", "format": 1, "rawSql": "SELECT round(100 * countIf(op = 'read' AND is_stale = 1) / nullIf(countIf(op = 'read'), 0), 1) AS value FROM helios.memory_operation" }
+      ],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/.*/" }, "colorMode": "background", "graphMode": "none", "textMode": "value" },
+      "fieldConfig": { "defaults": { "unit": "percent", "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "orange", "value": 10 }, { "color": "red", "value": 40 } ] } }, "overrides": [] }
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Avg Confidence",
+      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 0 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" }, "editorType": "sql", "queryType": "table", "format": 1, "rawSql": "SELECT round(avg(confidence), 2) AS value FROM helios.memory_operation WHERE confidence IS NOT NULL" }
+      ],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/.*/" }, "colorMode": "value", "graphMode": "none", "textMode": "value" },
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "purple" }, "unit": "percentunit", "min": 0, "max": 1 }, "overrides": [] }
+    },
+    {
+      "id": 7,
+      "type": "barchart",
+      "title": "Memory Age by Key (days)",
+      "description": "How old was each retrieved memory at read time? Tall bars = stale risk.",
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 4 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" }, "editorType": "sql", "queryType": "table", "format": 1, "rawSql": "SELECT key AS memory_key, round(age_ms / 86400000, 1) AS age_days FROM helios.memory_operation WHERE op = 'read' AND age_ms IS NOT NULL ORDER BY age_days DESC" }
+      ],
+      "options": { "orientation": "horizontal", "showValue": "always", "legend": { "displayMode": "list", "placement": "bottom" }, "xField": "memory_key" },
+      "fieldConfig": { "defaults": { "unit": "d", "color": { "mode": "continuous-GrYlRd" } }, "overrides": [] }
+    },
+    {
+      "id": 8,
+      "type": "piechart",
+      "title": "Operations by Type",
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 4 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" }, "editorType": "sql", "queryType": "table", "format": 1, "rawSql": "SELECT op, count() AS ops FROM helios.memory_operation GROUP BY op ORDER BY ops DESC" }
+      ],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/^ops$/" }, "pieType": "donut", "legend": { "displayMode": "table", "placement": "right", "values": ["value"] } },
+      "fieldConfig": { "defaults": {}, "overrides": [] }
+    },
+    {
+      "id": 9,
+      "type": "table",
+      "title": "Memory Operations (stale highlighted)",
+      "gridPos": { "h": 11, "w": 24, "x": 0, "y": 13 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" }, "editorType": "sql", "queryType": "table", "format": 1, "rawSql": "SELECT op AS \"Op\", store AS \"Store\", namespace AS \"Namespace\", key AS \"Key\", source AS \"Source\", confidence AS \"Confidence\", round(age_ms / 86400000, 1) AS \"Age (days)\", if(is_stale = 1, 'STALE', 'fresh') AS \"Freshness\", content AS \"Content\" FROM helios.memory_operation ORDER BY age_ms DESC" }
+      ],
+      "options": { "showHeader": true, "cellHeight": "sm" },
+      "fieldConfig": {
+        "defaults": { "custom": { "align": "auto", "filterable": true } },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Freshness" },
+            "properties": [ { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "basic" } }, { "id": "mappings", "value": [ { "type": "value", "options": { "STALE": { "color": "red", "index": 0 }, "fresh": { "color": "green", "index": 1 } } } ] } ]
+          },
+          { "matcher": { "id": "byName", "options": "Confidence" }, "properties": [ { "id": "unit", "value": "percentunit" }, { "id": "custom.cellOptions", "value": { "type": "gauge", "mode": "gradient" } }, { "id": "min", "value": 0 }, { "id": "max", "value": 1 } ] },
+          { "matcher": { "id": "byName", "options": "Age (days)" }, "properties": [ { "id": "unit", "value": "d" } ] }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://helios.dev/schema/v1/decision_edge.schema.json",
+  "title": "HELIOS decision_edge (v1)",
+  "description": "A causal edge: which source (memory|tool|llm) influenced which target.",
+  "type": "object",
+  "unevaluatedProperties": false,
+  "allOf": [{ "$ref": "https://helios.dev/schema/v1/common.schema.json#/$defs/envelope" }],
+  "properties": {
+    "schema_version": { "$ref": "https://helios.dev/schema/v1/common.schema.json#/$defs/semver" },
+    "tenant_id": { "$ref": "https://helios.dev/schema/v1/common.schema.json#/$defs/tenant_id" },
+    "agent_run_id": { "$ref": "https://helios.dev/schema/v1/common.schema.json#/$defs/uuid" },
+
+    "decision_edge_id": { "$ref": "https://helios.dev/schema/v1/common.schema.json#/$defs/uuid" },
+    "trace_id": { "$ref": "https://helios.dev/schema/v1/common.schema.json#/$defs/trace_id" },
+
+    "source_type": {
+      "type": "string",
+      "enum": ["memory_operation", "mcp_invocation", "llm_call"]
+    },
+    "source_id": { "type": "string", "minLength": 1 },
+    "target_type": {
+      "type": "string",
+      "enum": ["mcp_invocation", "memory_operation", "llm_call", "final_answer", "agent_step"]
+    },
+    "target_id": { "type": "string", "minLength": 1 },
+
+    "relation": {
+      "type": "string",
+      "enum": ["influenced", "caused", "informed", "triggered"]
+    },
+    "weight": { "$ref": "https://helios.dev/schema/v1/common.schema.json#/$defs/unit_interval" },
+    "step_index": { "$ref": "https://helios.dev/schema/v1/common.schema.json#/$defs/non_negative_int" }
+  },
+  "required": [
+    "decision_edge_id",
+    "source_type",
+    "source_id",
+    "target_type",
+    "target_id",
+    "relation"
+  ]
+}

@@ -1,0 +1,16 @@
+apiVersion: 1
+
+# HELIOS V1 — dashboard provisioning. Loads the HELIOS dashboards from disk into
+# a "HELIOS" folder on every Grafana boot. Edits in the UI are allowed but the
+# files on disk remain the source of truth.
+providers:
+  - name: HELIOS
+    orgId: 1
+    folder: HELIOS
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/helios
+      foldersFromFilesStructure: false

@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://helios.dev/schema/v1/memory_operation.schema.json",
+  "title": "HELIOS memory_operation (v1)",
+  "description": "A read/write/update/evict against a memory backend. Captured, not managed.",
+  "type": "object",
+  "unevaluatedProperties": false,
+  "allOf": [{ "$ref": "https://helios.dev/schema/v1/common.schema.json#/$defs/envelope" }],
+  "properties": {
+    "schema_version": { "$ref": "https://helios.dev/schema/v1/common.schema.json#/$defs/semver" },
+    "tenant_id": { "$ref": "https://helios.dev/schema/v1/common.schema.json#/$defs/tenant_id" },
+    "agent_run_id": { "$ref": "https://helios.dev/schema/v1/common.schema.json#/$defs/uuid" },
+
+    "memory_operation_id": { "$ref": "https://helios.dev/schema/v1/common.schema.json#/$defs/uuid" },
+    "trace_id": { "$ref": "https://helios.dev/schema/v1/common.schema.json#/$defs/trace_id" },
+    "span_id": { "$ref": "https://helios.dev/schema/v1/common.schema.json#/$defs/span_id" },
+
+    "op": { "type": "string", "enum": ["read", "write", "update", "evict"] },
+    "store": { "type": "string" },
+    "namespace": { "type": "string" },
+    "key": { "type": "string" },
+    "query": { "type": "string", "description": "Read query text, redactable." },
+    "content": { "type": "string", "description": "Stored/retrieved content, redactable." },
+    "source": { "type": "string" },
+    "confidence": { "$ref": "https://helios.dev/schema/v1/common.schema.json#/$defs/unit_interval" },
+
+    "created_at": { "$ref": "https://helios.dev/schema/v1/common.schema.json#/$defs/rfc3339" },
+    "age_ms": { "$ref": "https://helios.dev/schema/v1/common.schema.json#/$defs/non_negative_int" },
+    "is_stale": { "type": "boolean" },
+
+    "latency_ms": { "$ref": "https://helios.dev/schema/v1/common.schema.json#/$defs/non_negative_int" },
+    "status": { "$ref": "https://helios.dev/schema/v1/common.schema.json#/$defs/status" }
+  },
+  "required": [
+    "memory_operation_id",
+    "trace_id",
+    "span_id",
+    "op",
+    "status"
+  ]
+}

@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://helios.dev/schema/v1/mcp_invocation.schema.json",
+  "title": "HELIOS mcp_invocation (v1)",
+  "description": "A single call to an MCP server. Captured via versioned adapters.",
+  "type": "object",
+  "unevaluatedProperties": false,
+  "allOf": [{ "$ref": "https://helios.dev/schema/v1/common.schema.json#/$defs/envelope" }],
+  "properties": {
+    "schema_version": { "$ref": "https://helios.dev/schema/v1/common.schema.json#/$defs/semver" },
+    "tenant_id": { "$ref": "https://helios.dev/schema/v1/common.schema.json#/$defs/tenant_id" },
+    "agent_run_id": { "$ref": "https://helios.dev/schema/v1/common.schema.json#/$defs/uuid" },
+
+    "mcp_invocation_id": { "$ref": "https://helios.dev/schema/v1/common.schema.json#/$defs/uuid" },
+    "trace_id": { "$ref": "https://helios.dev/schema/v1/common.schema.json#/$defs/trace_id" },
+    "span_id": { "$ref": "https://helios.dev/schema/v1/common.schema.json#/$defs/span_id" },
+    "parent_span_id": { "$ref": "https://helios.dev/schema/v1/common.schema.json#/$defs/span_id" },
+
+    "server_name": { "type": "string", "minLength": 1 },
+    "server_version": { "type": "string" },
+    "transport": { "type": "string", "enum": ["stdio", "http", "sse"] },
+    "protocol_version": { "type": "string", "minLength": 1 },
+
+    "method": { "type": "string", "minLength": 1 },
+    "tool_name": { "type": "string" },
+    "tool_arguments": { "type": "string", "description": "JSON-encoded, redactable." },
+    "tool_result": { "type": "string", "description": "JSON-encoded, redactable." },
+
+    "permission_scope": { "type": "string" },
+    "permission_changed": { "type": "boolean" },
+
+    "sequence_index": { "$ref": "https://helios.dev/schema/v1/common.schema.json#/$defs/non_negative_int" },
+
+    "latency_ms": { "$ref": "https://helios.dev/schema/v1/common.schema.json#/$defs/non_negative_int" },
+    "status": { "$ref": "https://helios.dev/schema/v1/common.schema.json#/$defs/status" },
+    "error_type": { "type": "string" },
+    "error_message": { "type": "string" },
+    "failure_mode": {
+      "type": "string",
+      "enum": ["timeout", "permission_denied", "server_error", "bad_response", "cancelled"]
+    }
+  },
+  "required": [
+    "mcp_invocation_id",
+    "trace_id",
+    "span_id",
+    "server_name",
+    "protocol_version",
+    "method",
+    "latency_ms",
+    "status"
+  ],
+  "$comment": "When status=error, error_type and failure_mode are expected.",
+  "if": {
+    "properties": { "status": { "const": "error" } },
+    "required": ["status"]
+  },
+  "then": {
+    "required": ["error_type", "failure_mode"]
+  }
+}

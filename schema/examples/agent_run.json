@@ -1,0 +1,21 @@
+{
+  "schema_version": "1.0.0",
+  "tenant_id": "default",
+  "agent_run_id": "a1b2c3d4-0001-4a1a-8b2b-000000000001",
+  "trace_id": "0af7651916cd43dd8448eb211c80319c",
+  "root_span_id": "b7ad6b7169203331",
+  "agent_name": "support-assistant",
+  "agent_id": "support-assistant",
+  "agent_version": "0.3.1",
+  "agent_framework": "langgraph",
+  "input": "What is our current refund window for online orders?",
+  "output": "Our refund window is 14 days from purchase.",
+  "status": "ok",
+  "start_time": "2026-06-12T09:30:00.000000000Z",
+  "end_time": "2026-06-12T09:30:03.420000000Z",
+  "duration_ms": 3420,
+  "input_tokens": 412,
+  "output_tokens": 38,
+  "cost_usd": 0.0021,
+  "outcome_correct": false
+}

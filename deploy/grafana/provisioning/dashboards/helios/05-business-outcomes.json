@@ -1,0 +1,148 @@
+{
+  "uid": "helios-business-outcomes",
+  "title": "HELIOS · Business Outcomes",
+  "description": "Connects AI runtime problems to business impact: KPI trends and the quantified technical drivers behind each shift.",
+  "tags": ["helios", "business", "outcomes", "agent-runtime-intelligence"],
+  "timezone": "browser",
+  "editable": true,
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-12h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "text",
+      "title": "What this shows",
+      "gridPos": { "h": 4, "w": 24, "x": 0, "y": 0 },
+      "options": {
+        "mode": "markdown",
+        "content": "### From engineering signals to business impact\n\nEngineers see latency and errors. Executives ask: *did revenue drop? did support get worse?* This board links the two — when a **business metric** moves, HELIOS finds the **technical driver** in the same time window and explains it in plain language."
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Support Resolution (latest)",
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 4 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" }, "editorType": "sql", "queryType": "table", "format": 1, "rawSql": "SELECT value AS v FROM helios.business_kpi WHERE metric = 'support_resolution_rate' ORDER BY bucket_start DESC LIMIT 1" }
+      ],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/.*/" }, "colorMode": "background", "graphMode": "none", "textMode": "value" },
+      "fieldConfig": { "defaults": { "unit": "percent", "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "orange", "value": 80 }, { "color": "green", "value": 90 } ] } }, "overrides": [] }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Revenue / hour (latest)",
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 4 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" }, "editorType": "sql", "queryType": "table", "format": 1, "rawSql": "SELECT value AS v FROM helios.business_kpi WHERE metric = 'revenue_per_hour' ORDER BY bucket_start DESC LIMIT 1" }
+      ],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/.*/" }, "colorMode": "value", "graphMode": "none", "textMode": "value" },
+      "fieldConfig": { "defaults": { "unit": "currencyUSD", "color": { "mode": "fixed", "fixedColor": "green" } }, "overrides": [] }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Latest KPI Shift",
+      "description": "Signed change of the most recent correlation vs its baseline.",
+      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 4 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" }, "editorType": "sql", "queryType": "table", "format": 1, "rawSql": "SELECT delta_pct AS v FROM helios.outcome_correlation ORDER BY created_at DESC LIMIT 1" }
+      ],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/.*/" }, "colorMode": "background", "graphMode": "none", "textMode": "value" },
+      "fieldConfig": { "defaults": { "unit": "percent", "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "orange", "value": -1 }, { "color": "green", "value": 1 } ] } }, "overrides": [] }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Link Strength",
+      "description": "How strongly the technical driver correlates with the KPI shift (0–1).",
+      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 4 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" }, "editorType": "sql", "queryType": "table", "format": 1, "rawSql": "SELECT correlation_score AS v FROM helios.outcome_correlation WHERE driver_metric != '' ORDER BY created_at DESC LIMIT 1" }
+      ],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/.*/" }, "colorMode": "background", "graphMode": "none", "textMode": "value" },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1, "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "orange", "value": 0.3 }, { "color": "red", "value": 0.5 } ] } }, "overrides": [] }
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "Executive Summary",
+      "description": "Plain-language link between the latest business shift and its technical cause.",
+      "gridPos": { "h": 5, "w": 24, "x": 0, "y": 9 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" }, "editorType": "sql", "queryType": "table", "format": 1, "rawSql": "SELECT summary AS value FROM helios.outcome_correlation WHERE driver_metric != '' ORDER BY created_at DESC LIMIT 1" }
+      ],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/.*/" }, "colorMode": "background", "graphMode": "none", "textMode": "value", "wideLayout": true, "justifyMode": "left" },
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "orange" } }, "overrides": [] }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Support Resolution Rate — trend",
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 14 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" }, "editorType": "sql", "queryType": "time_series", "format": 2, "rawSql": "SELECT bucket_start AS time, value AS \"Support resolution %\" FROM helios.business_kpi WHERE metric = 'support_resolution_rate' ORDER BY bucket_start" }
+      ],
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "single" } },
+      "fieldConfig": { "defaults": { "unit": "percent", "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 15, "pointSize": 6, "showPoints": "always" }, "color": { "mode": "fixed", "fixedColor": "blue" }, "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "green", "value": 90 } ] } }, "overrides": [] }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Revenue / hour — trend",
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 14 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" }, "editorType": "sql", "queryType": "time_series", "format": 2, "rawSql": "SELECT bucket_start AS time, value AS \"Revenue/hour (USD)\" FROM helios.business_kpi WHERE metric = 'revenue_per_hour' ORDER BY bucket_start" }
+      ],
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "single" } },
+      "fieldConfig": { "defaults": { "unit": "currencyUSD", "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 15, "pointSize": 6, "showPoints": "always" }, "color": { "mode": "fixed", "fixedColor": "green" } }, "overrides": [] }
+    },
+    {
+      "id": 9,
+      "type": "table",
+      "title": "Contributing Technical Drivers (latest correlation)",
+      "description": "Each technical factor that moved with the business metric, ranked by correlation weight.",
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 23 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" }, "editorType": "sql", "queryType": "table", "format": 1, "rawSql": "WITH latest AS (SELECT factors FROM helios.outcome_correlation WHERE driver_metric != '' ORDER BY created_at DESC LIMIT 1) SELECT replace(JSONExtractString(f, 'factor'), '_', ' ') AS \"Factor\", round(JSONExtractFloat(f, 'weight') * 100, 0) AS \"Weight %\", JSONExtractString(f, 'evidence') AS \"Evidence\" FROM (SELECT arrayJoin(JSONExtractArrayRaw(factors)) AS f FROM latest) ORDER BY \"Weight %\" DESC" }
+      ],
+      "options": { "showHeader": true, "cellHeight": "sm" },
+      "fieldConfig": {
+        "defaults": { "custom": { "align": "auto", "filterable": false } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "Weight %" }, "properties": [ { "id": "unit", "value": "percent" }, { "id": "custom.cellOptions", "value": { "type": "gauge", "mode": "gradient" } }, { "id": "min", "value": 0 }, { "id": "max", "value": 100 } ] }
+        ]
+      }
+    },
+    {
+      "id": 10,
+      "type": "table",
+      "title": "Correlation History",
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 23 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" }, "editorType": "sql", "queryType": "table", "format": 1, "rawSql": "SELECT created_at AS \"When\", replace(metric, '_', ' ') AS \"Business Metric\", round(delta_pct, 1) AS \"Change %\", direction AS \"Direction\", replace(driver_metric, '_', ' ') AS \"Technical Driver\", round(correlation_score, 2) AS \"Strength\" FROM helios.outcome_correlation WHERE driver_metric != '' ORDER BY created_at DESC LIMIT 50" }
+      ],
+      "options": { "showHeader": true, "cellHeight": "sm" },
+      "fieldConfig": {
+        "defaults": { "custom": { "align": "auto", "filterable": true } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "Direction" }, "properties": [ { "id": "custom.cellOptions", "value": { "type": "color-text" } }, { "id": "mappings", "value": [ { "type": "value", "options": { "drop": { "color": "red", "index": 0 }, "rise": { "color": "green", "index": 1 }, "flat": { "color": "text", "index": 2 } } } ] } ] },
+          { "matcher": { "id": "byName", "options": "Change %" }, "properties": [ { "id": "unit", "value": "percent" } ] },
+          { "matcher": { "id": "byName", "options": "Strength" }, "properties": [ { "id": "unit", "value": "percentunit" } ] }
+        ]
+      }
+    }
+  ]
+}

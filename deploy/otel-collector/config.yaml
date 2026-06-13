@@ -1,0 +1,84 @@
+# HELIOS V1 — OpenTelemetry Collector
+# Receives OTLP from HELIOS SDKs and fans out to the storage backends.
+#   traces  -> Tempo  + ClickHouse
+#   logs    -> Loki   + ClickHouse
+#   metrics -> Mimir  + ClickHouse
+#
+# ClickHouse here stores OTLP-native telemetry (otel_traces/logs/metrics) to
+# prove end-to-end connectivity. The HELIOS semantic tables (agent_run,
+# mcp_invocation, memory_operation, decision_edge) are populated in Phase 3,
+# once the SDK emits the helios.*/mcp.*/memory.* attributes and a transform maps
+# them. The schema for those tables already exists in this database (Phase 1).
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  memory_limiter:
+    check_interval: 5s
+    limit_mib: 512
+    spike_limit_mib: 128
+  batch:
+    timeout: 5s
+    send_batch_size: 1024
+
+exporters:
+  # Traces -> Tempo (OTLP/gRPC)
+  otlp/tempo:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+
+  # Logs -> Loki (native OTLP ingestion endpoint)
+  otlphttp/loki:
+    endpoint: http://loki:3100/otlp
+
+  # Metrics -> Mimir (Prometheus remote write)
+  prometheusremotewrite/mimir:
+    endpoint: http://mimir:9009/api/v1/push
+    resource_to_telemetry_conversion:
+      enabled: true
+
+  # All signals -> ClickHouse (connectivity proof + future HELIOS source data)
+  clickhouse:
+    endpoint: tcp://clickhouse:9000?dial_timeout=10s
+    database: helios
+    username: helios
+    password: helios
+    create_schema: true
+    logs_table_name: otel_logs
+    traces_table_name: otel_traces
+    metrics_table_name: otel_metrics
+    ttl: 720h
+    retry_on_failure:
+      enabled: true
+      initial_interval: 5s
+      max_interval: 30s
+
+extensions:
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+service:
+  extensions: [health_check]
+  telemetry:
+    logs:
+      level: info
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlp/tempo, clickhouse]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlphttp/loki, clickhouse]
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [prometheusremotewrite/mimir, clickhouse]

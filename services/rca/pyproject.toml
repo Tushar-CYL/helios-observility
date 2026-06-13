@@ -1,0 +1,19 @@
+[project]
+name = "helios-rca"
+version = "0.1.0"
+description = "HELIOS RCA Copilot — local-LLM root-cause analysis for agent runs"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn>=0.27",
+    "pydantic>=2",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["helios_rca*"]

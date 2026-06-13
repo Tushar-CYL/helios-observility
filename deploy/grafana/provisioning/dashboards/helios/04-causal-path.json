@@ -1,0 +1,238 @@
+{
+  "uid": "helios-causal-path",
+  "title": "HELIOS · Why Did the Agent Do That?",
+  "description": "The flagship Agent Runtime Intelligence view: reconstructs the causal path from MCP calls and memory reads to the agent's final answer.",
+  "tags": ["helios", "causal", "rca", "agent-runtime-intelligence"],
+  "timezone": "browser",
+  "editable": true,
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-7d", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "text",
+      "title": "Scenario",
+      "gridPos": { "h": 5, "w": 8, "x": 0, "y": 0 },
+      "options": {
+        "mode": "markdown",
+        "content": "### What happened (in plain words)\n\nA customer asked: *What is our refund window?*\n\n1. The AI tried to look up the **official policy**, but that service **timed out** (failed).\n2. Instead of stopping, it quietly used an **old saved answer from 155 days ago**.\n3. That outdated answer led the AI to reply **14 days** — which is **wrong**.\n\nThe graph below shows this chain. **Red rings = where it went wrong.**"
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Final Answer Outcome",
+      "gridPos": { "h": 5, "w": 8, "x": 8, "y": 0 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" }, "editorType": "sql", "queryType": "table", "format": 1, "rawSql": "SELECT if(outcome_correct = 1, 'CORRECT', 'WRONG ANSWER') AS value FROM helios.agent_run ORDER BY start_time DESC LIMIT 1" }
+      ],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/.*/" }, "colorMode": "background", "graphMode": "none", "textMode": "value" },
+      "fieldConfig": { "defaults": { "mappings": [ { "type": "value", "options": { "WRONG ANSWER": { "color": "red", "index": 0 }, "CORRECT": { "color": "green", "index": 1 } } } ], "color": { "mode": "fixed", "fixedColor": "red" } }, "overrides": [] }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Root-Cause Signal",
+      "description": "The oldest stale memory read in this run — the prime suspect.",
+      "gridPos": { "h": 5, "w": 8, "x": 16, "y": 0 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" }, "editorType": "sql", "queryType": "table", "format": 1, "rawSql": "SELECT concat('stale: ', key, ' (', toString(round(age_ms / 86400000, 0)), 'd)') AS value FROM helios.memory_operation WHERE is_stale = 1 AND agent_run_id IN (SELECT agent_run_id FROM helios.agent_run ORDER BY start_time DESC LIMIT 1) ORDER BY age_ms DESC LIMIT 1" }
+      ],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/.*/" }, "colorMode": "background", "graphMode": "none", "textMode": "value" },
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "orange" } }, "overrides": [] }
+    },
+    {
+      "id": 4,
+      "type": "nodeGraph",
+      "title": "Causal Graph",
+      "description": "Nodes = MCP calls, memory reads, the LLM step and the final answer. Edges = influence/causality between them.",
+      "gridPos": { "h": 13, "w": 14, "x": 0, "y": 5 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" },
+          "editorType": "sql",
+          "queryType": "table",
+          "format": 1,
+          "rawSql": "WITH r AS (SELECT agent_run_id FROM helios.agent_run ORDER BY start_time DESC LIMIT 1) SELECT toString(mcp_invocation_id) AS id, replace(tool_name, '_', ' ') AS title, concat(server_name, ' / ', upper(status)) AS subtitle, if(status = 'error', upper(failure_mode), 'ok') AS mainstat, if(status = 'error', 0, 1) AS \"arc__ok\", if(status = 'error', 1, 0) AS \"arc__error\" FROM helios.mcp_invocation WHERE agent_run_id IN (SELECT agent_run_id FROM r) UNION ALL SELECT toString(memory_operation_id), if(is_stale = 1, concat('Used stale data: ', key), concat('Used data: ', key)), if(is_stale = 1, 'OUTDATED', 'fresh'), if(is_stale = 1, concat(toString(round(age_ms / 86400000, 0)), ' days old'), 'current'), if(is_stale = 1, 0, 1), if(is_stale = 1, 1, 0) FROM helios.memory_operation WHERE agent_run_id IN (SELECT agent_run_id FROM r) UNION ALL SELECT DISTINCT id, 'AI wrote the answer', 'language model', '', 1, 0 FROM (SELECT source_id AS id FROM helios.decision_edge WHERE source_type = 'llm_call' AND agent_run_id IN (SELECT agent_run_id FROM r) UNION ALL SELECT target_id FROM helios.decision_edge WHERE target_type = 'llm_call' AND agent_run_id IN (SELECT agent_run_id FROM r)) UNION ALL SELECT toString(agent_run_id), if(outcome_correct = 0, 'Final answer: WRONG', 'Final answer: OK'), 'shown to user', '', if(outcome_correct = 0, 0, 1), if(outcome_correct = 0, 1, 0) FROM helios.agent_run WHERE agent_run_id IN (SELECT agent_run_id FROM r)"
+        },
+        {
+          "refId": "B",
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" },
+          "editorType": "sql",
+          "queryType": "table",
+          "format": 1,
+          "rawSql": "WITH r AS (SELECT agent_run_id FROM helios.agent_run ORDER BY start_time DESC LIMIT 1) SELECT toString(decision_edge_id) AS id, source_id AS source, target_id AS target, multiIf(relation = 'triggered', 'forced fallback to', relation = 'influenced', 'shaped', relation = 'caused', 'produced', relation) AS mainstat FROM helios.decision_edge WHERE agent_run_id IN (SELECT agent_run_id FROM r) ORDER BY step_index"
+        }
+      ],
+      "options": { "nodes": {}, "edges": {} },
+      "fieldConfig": { "defaults": {}, "overrides": [ { "matcher": { "id": "byName", "options": "arc__ok" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } } ] }, { "matcher": { "id": "byName", "options": "arc__error" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } } ] } ] }
+    },
+    {
+      "id": 5,
+      "type": "table",
+      "title": "Resolved Causal Path (step by step)",
+      "description": "The decision edges resolved to human-readable labels, ordered by step. Read top to bottom to see how the wrong answer was reached.",
+      "gridPos": { "h": 13, "w": 10, "x": 14, "y": 5 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" },
+          "editorType": "sql",
+          "queryType": "table",
+          "format": 1,
+          "rawSql": "WITH r AS (SELECT agent_run_id FROM helios.agent_run ORDER BY start_time DESC LIMIT 1), labels AS ( SELECT toString(memory_operation_id) AS eid, if(is_stale = 1, concat('stale cache: ', key), concat('cache: ', key)) AS label FROM helios.memory_operation WHERE agent_run_id IN (SELECT agent_run_id FROM r) UNION ALL SELECT toString(mcp_invocation_id), concat(replace(tool_name, '_', ' '), ' (', server_name, ')') FROM helios.mcp_invocation WHERE agent_run_id IN (SELECT agent_run_id FROM r) UNION ALL SELECT DISTINCT id, 'AI model' FROM (SELECT source_id AS id FROM helios.decision_edge WHERE source_type = 'llm_call' AND agent_run_id IN (SELECT agent_run_id FROM r) UNION ALL SELECT target_id FROM helios.decision_edge WHERE target_type = 'llm_call' AND agent_run_id IN (SELECT agent_run_id FROM r)) UNION ALL SELECT toString(agent_run_id), concat('final answer: ', output) FROM helios.agent_run WHERE agent_run_id IN (SELECT agent_run_id FROM r) ) SELECT (de.step_index + 1) AS \"Step\", sl.label AS \"From\", multiIf(de.relation = 'triggered', 'forced fallback to', de.relation = 'influenced', 'shaped', de.relation = 'caused', 'produced', de.relation) AS \"What happened\", tl.label AS \"To\" FROM helios.decision_edge de LEFT JOIN labels sl ON sl.eid = de.source_id LEFT JOIN labels tl ON tl.eid = de.target_id WHERE de.agent_run_id IN (SELECT agent_run_id FROM r) ORDER BY de.step_index"
+        }
+      ],
+      "options": { "showHeader": true, "cellHeight": "md" },
+      "fieldConfig": {
+        "defaults": { "custom": { "align": "auto", "filterable": false } },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "What happened" },
+            "properties": [ { "id": "custom.cellOptions", "value": { "type": "color-text" } }, { "id": "mappings", "value": [ { "type": "value", "options": { "produced": { "color": "red", "index": 0 }, "shaped": { "color": "orange", "index": 1 }, "forced fallback to": { "color": "yellow", "index": 2 } } } ] } ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 6,
+      "type": "row",
+      "title": "AI Ops Copilot — Root-Cause Analysis",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 18 },
+      "panels": []
+    },
+    {
+      "id": 7,
+      "type": "stat",
+      "title": "Copilot Summary",
+      "description": "Plain-language root-cause explanation from the HELIOS RCA Copilot (local-LLM or heuristic, grounded in telemetry).",
+      "gridPos": { "h": 6, "w": 14, "x": 0, "y": 19 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" }, "editorType": "sql", "queryType": "table", "format": 1, "rawSql": "SELECT summary AS value FROM helios.rca_report WHERE agent_run_id = (SELECT agent_run_id FROM helios.agent_run ORDER BY start_time DESC LIMIT 1) ORDER BY created_at DESC LIMIT 1" }
+      ],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/.*/" }, "colorMode": "none", "graphMode": "none", "textMode": "value", "wideLayout": true, "justifyMode": "left" },
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "text" } }, "overrides": [] }
+    },
+    {
+      "id": 8,
+      "type": "stat",
+      "title": "Suggested Fix",
+      "gridPos": { "h": 6, "w": 10, "x": 14, "y": 19 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" }, "editorType": "sql", "queryType": "table", "format": 1, "rawSql": "SELECT suggested_fix AS value FROM helios.rca_report WHERE agent_run_id = (SELECT agent_run_id FROM helios.agent_run ORDER BY start_time DESC LIMIT 1) ORDER BY created_at DESC LIMIT 1" }
+      ],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/.*/" }, "colorMode": "value", "graphMode": "none", "textMode": "value", "wideLayout": true, "justifyMode": "left" },
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "green" } }, "overrides": [] }
+    },
+    {
+      "id": 9,
+      "type": "table",
+      "title": "Ranked Root Causes (probability)",
+      "description": "Grounded candidate causes detected from telemetry, ranked by signal strength. The Copilot narrates these; it does not invent them.",
+      "gridPos": { "h": 9, "w": 18, "x": 0, "y": 25 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" }, "editorType": "sql", "queryType": "table", "format": 1, "rawSql": "WITH latest AS (SELECT causes FROM helios.rca_report WHERE agent_run_id = (SELECT agent_run_id FROM helios.agent_run ORDER BY start_time DESC LIMIT 1) ORDER BY created_at DESC LIMIT 1) SELECT round(JSONExtractFloat(c, 'probability') * 100, 1) AS \"Probability %\", JSONExtractString(c, 'hypothesis') AS \"Hypothesis\" FROM (SELECT arrayJoin(JSONExtractArrayRaw(causes)) AS c FROM latest) ORDER BY \"Probability %\" DESC" }
+      ],
+      "options": { "showHeader": true, "cellHeight": "md" },
+      "fieldConfig": {
+        "defaults": { "custom": { "align": "auto", "filterable": false } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "Probability %" }, "properties": [ { "id": "unit", "value": "percent" }, { "id": "custom.width", "value": 160 }, { "id": "custom.cellOptions", "value": { "type": "gauge", "mode": "gradient" } }, { "id": "min", "value": 0 }, { "id": "max", "value": 100 } ] }
+        ]
+      }
+    },
+    {
+      "id": 10,
+      "type": "stat",
+      "title": "Copilot Engine",
+      "description": "Which reasoner produced the latest report and how long it took.",
+      "gridPos": { "h": 9, "w": 6, "x": 18, "y": 25 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" }, "editorType": "sql", "queryType": "table", "format": 1, "rawSql": "SELECT concat(reasoner, if(model != '', concat(' (', model, ')'), ''), ' \u00b7 ', toString(latency_ms), ' ms') AS value FROM helios.rca_report WHERE agent_run_id = (SELECT agent_run_id FROM helios.agent_run ORDER BY start_time DESC LIMIT 1) ORDER BY created_at DESC LIMIT 1" }
+      ],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/.*/" }, "colorMode": "value", "graphMode": "none", "textMode": "value", "justifyMode": "center" },
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "purple" } }, "overrides": [] }
+    },
+    {
+      "id": 11,
+      "type": "row",
+      "title": "Evaluations — Quality Gate",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 34 },
+      "panels": []
+    },
+    {
+      "id": 12,
+      "type": "stat",
+      "title": "Overall Quality Score",
+      "description": "Mean of all evaluator scores for the latest run (0–1).",
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 35 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" }, "editorType": "sql", "queryType": "table", "format": 1, "rawSql": "WITH r AS (SELECT agent_run_id FROM helios.agent_run ORDER BY start_time DESC LIMIT 1), latest AS (SELECT max(created_at) AS t FROM helios.eval_result WHERE agent_run_id IN (SELECT agent_run_id FROM r)) SELECT round(avg(score), 2) AS value FROM helios.eval_result WHERE agent_run_id IN (SELECT agent_run_id FROM r) AND created_at = (SELECT t FROM latest)" }
+      ],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/.*/" }, "colorMode": "background", "graphMode": "none", "textMode": "value" },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1, "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "orange", "value": 0.5 }, { "color": "green", "value": 0.8 } ] } }, "overrides": [] }
+    },
+    {
+      "id": 13,
+      "type": "stat",
+      "title": "Checks Passed",
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 35 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" }, "editorType": "sql", "queryType": "table", "format": 1, "rawSql": "WITH r AS (SELECT agent_run_id FROM helios.agent_run ORDER BY start_time DESC LIMIT 1), latest AS (SELECT max(created_at) AS t FROM helios.eval_result WHERE agent_run_id IN (SELECT agent_run_id FROM r)) SELECT concat(toString(countIf(passed = 1)), ' / ', toString(count())) AS value FROM helios.eval_result WHERE agent_run_id IN (SELECT agent_run_id FROM r) AND created_at = (SELECT t FROM latest)" }
+      ],
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "/.*/" }, "colorMode": "value", "graphMode": "none", "textMode": "value" },
+      "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "blue" } }, "overrides": [] }
+    },
+    {
+      "id": 14,
+      "type": "table",
+      "title": "Evaluation Results (latest run)",
+      "description": "Code checks, LLM-as-judge faithfulness, and drift — the quality gate that decides whether RCA auto-triggers.",
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 35 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" }, "editorType": "sql", "queryType": "table", "format": 1, "rawSql": "WITH r AS (SELECT agent_run_id FROM helios.agent_run ORDER BY start_time DESC LIMIT 1), latest AS (SELECT max(created_at) AS t FROM helios.eval_result WHERE agent_run_id IN (SELECT agent_run_id FROM r)) SELECT evaluator AS \"Evaluator\", evaluator_kind AS \"Kind\", if(passed = 1, 'PASS', 'FAIL') AS \"Result\", score AS \"Score\", label AS \"Label\", reason AS \"Reason\" FROM helios.eval_result WHERE agent_run_id IN (SELECT agent_run_id FROM r) AND created_at = (SELECT t FROM latest) ORDER BY passed ASC, score ASC" }
+      ],
+      "options": { "showHeader": true, "cellHeight": "sm" },
+      "fieldConfig": {
+        "defaults": { "custom": { "align": "auto", "filterable": true } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "Result" }, "properties": [ { "id": "custom.cellOptions", "value": { "type": "color-text" } }, { "id": "mappings", "value": [ { "type": "value", "options": { "FAIL": { "color": "red", "index": 0 }, "PASS": { "color": "green", "index": 1 } } } ] } ] },
+          { "matcher": { "id": "byName", "options": "Score" }, "properties": [ { "id": "unit", "value": "percentunit" }, { "id": "custom.cellOptions", "value": { "type": "gauge", "mode": "gradient" } }, { "id": "min", "value": 0 }, { "id": "max", "value": 1 } ] }
+        ]
+      }
+    },
+    {
+      "id": 15,
+      "type": "table",
+      "title": "Evaluator Kinds",
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 40 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "grafana-clickhouse-datasource", "uid": "helios-clickhouse" }, "editorType": "sql", "queryType": "table", "format": 1, "rawSql": "WITH r AS (SELECT agent_run_id FROM helios.agent_run ORDER BY start_time DESC LIMIT 1), latest AS (SELECT max(created_at) AS t FROM helios.eval_result WHERE agent_run_id IN (SELECT agent_run_id FROM r)) SELECT evaluator_kind AS \"Kind\", round(avg(score), 2) AS \"Avg Score\", count() AS \"Checks\" FROM helios.eval_result WHERE agent_run_id IN (SELECT agent_run_id FROM r) AND created_at = (SELECT t FROM latest) GROUP BY evaluator_kind ORDER BY \"Avg Score\" ASC" }
+      ],
+      "options": { "showHeader": true, "cellHeight": "sm" },
+      "fieldConfig": {
+        "defaults": { "custom": { "align": "auto", "filterable": false } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "Avg Score" }, "properties": [ { "id": "unit", "value": "percentunit" }, { "id": "custom.cellOptions", "value": { "type": "gauge", "mode": "gradient" } }, { "id": "min", "value": 0 }, { "id": "max", "value": 1 } ] }
+        ]
+      }
+    }
+  ]
+}

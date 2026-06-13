@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.env
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
+
+# HELIOS local scratch
+deploy/scripts/_*.json
+
+# Docker volumes are managed by Docker, not the repo — nothing to ignore here,
+# but local override files are:
+deploy/docker-compose.override.yml

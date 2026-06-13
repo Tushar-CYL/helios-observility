@@ -1,0 +1,43 @@
+[
+  {
+    "schema_version": "1.0.0",
+    "tenant_id": "default",
+    "agent_run_id": "a1b2c3d4-0001-4a1a-8b2b-000000000001",
+    "memory_operation_id": "a1b2c3d4-0003-4a1a-8b2b-000000000020",
+    "trace_id": "0af7651916cd43dd8448eb211c80319c",
+    "span_id": "2222222222220001",
+    "op": "read",
+    "store": "redis",
+    "namespace": "policy-cache",
+    "key": "refund-window",
+    "query": "refund window online orders",
+    "content": "Refund window: 14 days from purchase.",
+    "source": "policy-db-mcp@2025-01-10",
+    "confidence": 0.81,
+    "created_at": "2026-01-10T08:00:00.000000000Z",
+    "age_ms": 13439400000,
+    "is_stale": true,
+    "latency_ms": 4,
+    "status": "ok"
+  },
+  {
+    "schema_version": "1.0.0",
+    "tenant_id": "default",
+    "agent_run_id": "a1b2c3d4-0001-4a1a-8b2b-000000000001",
+    "memory_operation_id": "a1b2c3d4-0003-4a1a-8b2b-000000000021",
+    "trace_id": "0af7651916cd43dd8448eb211c80319c",
+    "span_id": "2222222222220002",
+    "op": "read",
+    "store": "redis",
+    "namespace": "session",
+    "key": "customer:c-8842:tier",
+    "content": "standard",
+    "source": "crm-mcp",
+    "confidence": 0.99,
+    "created_at": "2026-06-12T09:30:01.000000000Z",
+    "age_ms": 1200,
+    "is_stale": false,
+    "latency_ms": 3,
+    "status": "ok"
+  }
+]
